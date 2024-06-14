@@ -1,6 +1,4 @@
 """
-README
-
 This script allows you to search a Hugging Face dataset using either keyword or embedding-based search. 
 The script can be run directly from the command line or imported into another script to call the `run_search` function.
 
@@ -75,6 +73,12 @@ from scipy.spatial.distance import cosine
 import tiktoken
 from tqdm import tqdm
 
+# Static value for initial embedding size
+INITIAL_EMBEDDING_SIZE = 16
+
+# Global or higher scope initialization
+tokenizer = tiktoken.get_encoding("cl100k_base")
+
 def load_cached_dataset(cache_file):
     if os.path.exists(cache_file):
         with open(cache_file, 'r') as file:
@@ -113,18 +117,48 @@ def cosine_search(embedded_dataset, user_embedding, top_k):
 
     return top_results
 
-def format_output(schema, output_keys):
+def format_output(schema, output_keys, chunk_size=100):
     output = ""
     for key in output_keys:
         if key in schema:
-            output += f"{key.capitalize()}: {schema[key]}\n"
+            text = schema[key]
+            tokens = tokenizer.encode(text)
+            chunks = [tokenizer.decode(tokens[i:i + chunk_size]) for i in range(0, len(tokens), chunk_size)]
+            for chunk in chunks:
+                output += f"{key.capitalize()}: {chunk}\n"
+            output += "\n"  # Add a newline for separation between different keys
     return output
 
 def chunk_text(text, chunk_size):
-    tokenizer = tiktoken.get_encoding("cl100k_base")
     tokens = tokenizer.encode(text)
-    chunks = [tokenizer.decode(tokens[i:i+chunk_size]) for i in range(0, len(tokens), chunk_size)]
+    chunks = []
+    start = 0
+    
+    while start < len(tokens):
+        if start + chunk_size >= len(tokens):
+            # If remaining tokens are fewer than the chunk size, take all remaining tokens
+            end = len(tokens)
+        else:
+            # Otherwise, try to find the best place to split
+            end = start + chunk_size
+            while end > start and not tokenizer.decode(tokens[end - 1:end]).isspace():
+                if tokenizer.decode(tokens[end - 1:end]) in ',.?!':
+                    # If a punctuation mark is found, break after this point
+                    end += 1
+                    break
+                end -= 1
+
+            # If no punctuation is found, and we're back at start, enforce the chunk size limit
+            if end == start:
+                end = start + chunk_size
+
+        # Decode the chunk and add it to the list
+        chunk = tokenizer.decode(tokens[start:end])
+        chunks.append(chunk)
+        start = end
+
     return chunks
+
 
 def run_search(dataset_location, query=None, search_key=None, output_keys=None, search_type=None, top_k=5, chunk_size=100):
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -166,7 +200,7 @@ def run_search(dataset_location, query=None, search_key=None, output_keys=None, 
             for example in tqdm(dataset_list, desc="Embedding"):
                 if search_key in example:
                     value = example[search_key]
-                    chunks = chunk_text(value, chunk_size)
+                    chunks = chunk_text(value, chunk_size)  # Use the specified chunk size
                     for chunk in chunks:
                         chunk_embedding = embedder.embed(chunk)
                         embedded_dataset[chunk] = {
@@ -185,21 +219,20 @@ def run_search(dataset_location, query=None, search_key=None, output_keys=None, 
                 embedded_dataset = pickle.load(file)
 
         # Create an instance of the embedder
-        # embedder = Embed4All(device='gpu')
-          embedder = Embed4All()
+        embedder = Embed4All(device='gpu')
 
     if search_type.lower() == 'keyword':
         print("Performing keyword search...")
         top_results = keyword_search(dataset_list, query, search_key, top_k)
     elif search_type.lower() == 'embedding':
         print("Performing embedding search...")
-        chunks = chunk_text(query, chunk_size)
         top_results = []
-        for chunk in tqdm(chunks, desc="Searching"):
-            user_embedding = embedder.embed(chunk)
+        query_chunks = chunk_text(query, chunk_size)
+        for query_chunk in tqdm(query_chunks, desc="Searching"):
+            user_embedding = embedder.embed(query_chunk)
             chunk_results = cosine_search(embedded_dataset, user_embedding, top_k)
             top_results.extend(chunk_results)
-        top_results = sorted(top_results)[:top_k]
+        top_results = sorted(top_results, key=lambda x: x[0])[:top_k]
     else:
         raise ValueError("Invalid search type. Please enter 'embedding' or 'keyword'.")
 
@@ -221,7 +254,7 @@ def run_search(dataset_location, query=None, search_key=None, output_keys=None, 
             print()
 
             print("Formatted Output:")
-            output = format_output(matched_schema, output_keys)
+            output = format_output(matched_schema, output_keys, chunk_size)  # Ensure chunk_size is passed correctly
             print(output)
             print()
 
@@ -238,7 +271,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_keys', nargs='+', help='Output keys (space-separated)')
     parser.add_argument('--search_type', choices=['embedding', 'keyword'], help='Search type (embedding/keyword)')
     parser.add_argument('--top_k', type=int, default=5, help='Number of top results to return')
-    parser.add_argument('--chunk_size', type=int, default=100, help='Chunk size for embedding resoultion')
+    parser.add_argument('--chunk_size', type=int, default=100, help='Chunk size for embedding resolution and output formatting')
     args = parser.parse_args()
 
     run_search(args.dataset, args.query, args.search_key, args.output_keys, args.search_type, args.top_k, args.chunk_size)
