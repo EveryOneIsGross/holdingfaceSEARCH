@@ -4,6 +4,7 @@
 This script allows you to search a Hugging Face dataset using either keyword or embedding-based search. 
 The script can be run directly from the command line or imported into another script to call the `run_search` function.
 
+```yaml
 Usage:
     Command Line:
         python script.py dataset query --search_key search_key --output_keys output_key1 output_key2 --search_type search_type --top_k top_k --chunk_size chunk_size
@@ -63,3 +64,4 @@ Functions:
 
     run_search(dataset_location, query, search_key, output_keys, search_type, top_k=5, chunk_size=100):
         Main function to perform the search on the specified dataset.
+```
