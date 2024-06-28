@@ -62,22 +62,6 @@ def keyword_search(dataset, query, search_keys, top_k):
 
     return top_results
 
-def cosine_search_multi_key(embedded_dataset, user_embedding, top_k, weights=None):
-    cosine_distances = []
-
-    for key, data in embedded_dataset.items():
-        distances = [cosine(user_embedding, emb) for emb in data['embeddings']]
-        if weights:
-            weighted_distance = sum(d * w for d, w in zip(distances, weights))
-        else:
-            weighted_distance = sum(distances) / len(distances)
-        cosine_distances.append((weighted_distance, key, data['full_schema']))
-
-    cosine_distances.sort()
-    top_results = cosine_distances[:top_k]
-
-    return top_results
-
 def truncate_text(text, max_tokens):
     tokens = tokenizer.encode(text)
     if len(tokens) <= max_tokens:
@@ -161,6 +145,29 @@ def chunk_text(text, chunk_size):
 
     return chunks
 
+def cosine_search_multi_key(embedded_dataset, user_embedding, top_k, weights=None):
+    cosine_distances = []
+
+    for key, data in embedded_dataset.items():
+        # Check if 'embedding' or 'embeddings' key exists
+        if 'embedding' in data:
+            distances = [cosine(user_embedding, data['embedding'])]
+        elif 'embeddings' in data:
+            distances = [cosine(user_embedding, emb) for emb in data['embeddings']]
+        else:
+            continue  # Skip this item if no embedding is found
+
+        if weights:
+            weighted_distance = sum(d * w for d, w in zip(distances, weights))
+        else:
+            weighted_distance = sum(distances) / len(distances)
+        cosine_distances.append((weighted_distance, key, data['full_schema']))
+
+    cosine_distances.sort()
+    top_results = cosine_distances[:top_k]
+
+    return top_results
+
 def run_search(dataset_location, query=None, search_keys=None, output_keys=None, search_type=None, top_k=5, chunk_size=100, max_output_tokens=200):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cache_file = os.path.join(script_dir, f"{dataset_location.replace('/', '_')}_cached_dataset.json")
@@ -185,19 +192,20 @@ def run_search(dataset_location, query=None, search_keys=None, output_keys=None,
         return
 
     if search_type.lower() == 'embedding':
+        embedder = Embed4All()
         if not os.path.exists(embedded_cache_file):
-            embedder = Embed4All()
             embedded_dataset = {}
             print(CYAN + "Embedding dataset...")
             for index, example in enumerate(tqdm(dataset_list, desc="Embedding")):
-                embedded_dataset[str(index)] = {'embeddings': [], 'full_schema': example}
+                embedded_dataset[str(index)] = {'full_schema': example}
                 for search_key in search_keys:
                     if search_key in example:
                         value = example[search_key]
                         chunks = chunk_text(value, chunk_size)
-                        for chunk in chunks:
-                            chunk_embedding = embedder.embed(chunk['text'])
-                            embedded_dataset[str(index)]['embeddings'].append(chunk_embedding)
+                        if len(chunks) == 1:
+                            embedded_dataset[str(index)]['embedding'] = embedder.embed(chunks[0]['text'])
+                        else:
+                            embedded_dataset[str(index)]['embeddings'] = [embedder.embed(chunk['text']) for chunk in chunks]
             print(CYAN + "Saving embedded dataset...")
             with open(embedded_cache_file, 'wb') as file:
                 pickle.dump(embedded_dataset, file)
@@ -205,8 +213,6 @@ def run_search(dataset_location, query=None, search_keys=None, output_keys=None,
             print(CYAN + "Loading embedded dataset...")
             with open(embedded_cache_file, 'rb') as file:
                 embedded_dataset = pickle.load(file)
-
-        embedder = Embed4All(device='gpu')
 
     if search_type.lower() == 'keyword':
         print(CYAN + "Performing keyword search...")
@@ -241,6 +247,8 @@ def run_search(dataset_location, query=None, search_keys=None, output_keys=None,
             print()
     else:
         print(RED + "No matching results found.")
+
+    return top_results
 
 if __name__ == '__main__':
     print(CYAN + Style.BRIGHT + "Dataset Search Tool")
