@@ -1,68 +1,3 @@
-"""
-This script allows you to search a Hugging Face dataset using either keyword or embedding-based search. 
-The script can be run directly from the command line or imported into another script to call the `run_search` function.
-
-Usage:
-    Command Line:
-        python script.py dataset query --search_key search_key --output_keys output_key1 output_key2 --search_type search_type --top_k top_k --chunk_size chunk_size
-
-    Import and Call:
-        from your_script import run_search
-        results = run_search('username/dataset_name', 'search query', 'search_key', ['output_key1', 'output_key2'], 'embedding', top_k=3)
-
-Arguments:
-    dataset (str): 
-        Hugging Face dataset location (e.g., username/dataset_name).
-
-    query (str, optional):
-        Search query. If not provided, the script will print the available keys from the dataset.
-
-    --search_key (str):
-        Key to search against in the dataset.
-
-    --output_keys (list of str):
-        List of output keys (space-separated) to include in the search results.
-
-    --search_type (str):
-        Type of search to perform. Must be either 'embedding' or 'keyword'.
-
-    --top_k (int, default=5):
-        Number of top results to return.
-
-    --chunk_size (int, default=100):
-        Chunk size for text chunking when performing embedding search.
-
-Examples:
-    Command Line:
-        python script.py zhengyun21/PMC-Patients "Chest pain" --search_key "patient" --output_keys "patient" "title" "age" --search_type keyword --top_k 3
-
-    Import and Call:
-        from your_script import run_search
-        results = run_search('zhengyun21/PMC-Patients', 'Chest pain', 'patient', ['patient', 'title', 'age'], 'keyword', top_k=3)
-
-Functions:
-    load_cached_dataset(cache_file):
-        Load cached dataset from a file.
-
-    save_cached_dataset(dataset, cache_file):
-        Save dataset to a cache file.
-
-    keyword_search(dataset, query, search_key, top_k):
-        Perform keyword search on the dataset.
-
-    cosine_search(embedded_dataset, user_embedding, top_k):
-        Perform embedding-based search on the dataset.
-
-    format_output(schema, output_keys):
-        Format the output results based on specified keys.
-
-    chunk_text(text, chunk_size):
-        Chunk the text into smaller pieces based on the specified chunk size.
-
-    run_search(dataset_location, query, search_key, output_keys, search_type, top_k=5, chunk_size=100):
-        Main function to perform the search on the specified dataset.
-
-"""
 import os
 import json
 import pickle
@@ -74,16 +9,23 @@ from tqdm import tqdm
 import argparse
 import colorama
 from colorama import Fore, Back, Style
+import re
+from pygments import highlight
+from pygments.lexers import JsonLexer, XmlLexer, HtmlLexer
+from pygments.formatters import TerminalFormatter
+import numpy as np
 
 # Initialize colorama
 colorama.init(autoreset=True)
 
-# Custom color definitions
-LIGHT_ORANGE = Fore.YELLOW + Style.BRIGHT
-ORANGE = Fore.YELLOW
-DARK_ORANGE = Fore.RED + Fore.YELLOW
-DARKER_ORANGE = Fore.RED + Style.DIM
-BURNT_ORANGE = Fore.RED
+# CGA-style color definitions
+CYAN = Fore.CYAN + Style.BRIGHT
+MAGENTA = Fore.MAGENTA + Style.BRIGHT
+WHITE = Fore.WHITE + Style.BRIGHT
+YELLOW = Fore.YELLOW + Style.BRIGHT
+GREEN = Fore.GREEN + Style.BRIGHT
+RED = Fore.RED + Style.BRIGHT
+BLUE = Fore.BLUE + Style.BRIGHT
 
 # Static value for initial embedding size
 INITIAL_EMBEDDING_SIZE = 16
@@ -102,43 +44,89 @@ def save_cached_dataset(dataset, cache_file):
     with open(cache_file, 'w') as file:
         json.dump(dataset, file)
 
-def keyword_search(dataset, query, search_key, top_k):
+def keyword_search(dataset, query, search_keys, top_k):
     query_keywords = query.lower().split()
     keyword_counts = []
 
     for example in dataset:
-        if search_key in example:
-            value = str(example[search_key]).lower()  # Convert to string to handle non-string types
-            keyword_count = sum(keyword in value for keyword in query_keywords)
-            keyword_counts.append((keyword_count, value, example))
+        total_count = 0
+        for search_key in search_keys:
+            if search_key in example:
+                value = str(example[search_key]).lower()
+                keyword_count = sum(keyword in value for keyword in query_keywords)
+                total_count += keyword_count
+        keyword_counts.append((total_count, example))
 
-    keyword_counts.sort(reverse=True, key=lambda x: x[0])  # Sort by keyword_count
+    keyword_counts.sort(reverse=True, key=lambda x: x[0])
     top_results = keyword_counts[:top_k]
 
     return top_results
 
-def cosine_search(embedded_dataset, user_embedding, top_k):
+def cosine_search_multi_key(embedded_dataset, user_embedding, top_k, weights=None):
     cosine_distances = []
 
     for key, data in embedded_dataset.items():
-        distance = cosine(user_embedding, data['embedding'])
-        cosine_distances.append((distance, key, data['full_schema']))
+        distances = [cosine(user_embedding, emb) for emb in data['embeddings']]
+        if weights:
+            weighted_distance = sum(d * w for d, w in zip(distances, weights))
+        else:
+            weighted_distance = sum(distances) / len(distances)
+        cosine_distances.append((weighted_distance, key, data['full_schema']))
 
     cosine_distances.sort()
     top_results = cosine_distances[:top_k]
 
     return top_results
 
-def format_output(schema, output_keys, chunk_size=100):
+def truncate_text(text, max_tokens):
+    tokens = tokenizer.encode(text)
+    if len(tokens) <= max_tokens:
+        return text
+    
+    truncated_tokens = tokens[:max_tokens]
+    truncated_text = tokenizer.decode(truncated_tokens)
+    
+    last_sentence_end = max(
+        truncated_text.rfind('.'),
+        truncated_text.rfind('!'),
+        truncated_text.rfind('?')
+    )
+    
+    if last_sentence_end != -1 and last_sentence_end > len(truncated_text) * 0.5:
+        return truncated_text[:last_sentence_end + 1]
+    else:
+        last_space = truncated_text.rfind(' ')
+        if last_space != -1:
+            return truncated_text[:last_space]
+        return truncated_text
+
+def detect_and_highlight(text):
+    try:
+        if isinstance(text, dict):
+            text = json.dumps(text, indent=2)
+        
+        json.loads(text)
+        return highlight(text, JsonLexer(), TerminalFormatter())
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    if isinstance(text, str) and text.strip().startswith('<') and text.strip().endswith('>'):
+        if re.match(r'<\?xml', text):
+            return highlight(text, XmlLexer(), TerminalFormatter())
+
+    if isinstance(text, str) and re.search(r'<(!DOCTYPE|html|body|head)', text, re.IGNORECASE):
+        return highlight(text, HtmlLexer(), TerminalFormatter())
+
+    return text
+
+def format_output(schema, output_keys, max_tokens=100):
     output = ""
     for key in output_keys:
         if key in schema:
             text = schema[key]
-            tokens = tokenizer.encode(text)
-            chunks = [tokenizer.decode(tokens[i:i + chunk_size]) for i in range(0, len(tokens), chunk_size)]
-            for chunk in chunks:
-                output += f"{key.capitalize()}: {chunk}\n"
-            output += "\n"  # Add a newline for separation between different keys
+            truncated_text = truncate_text(text, max_tokens)
+            highlighted_text = detect_and_highlight(truncated_text)
+            output += f"{YELLOW}{key.capitalize()}: {WHITE}{highlighted_text}\n\n"
     return output
 
 def chunk_text(text, chunk_size):
@@ -173,102 +161,106 @@ def chunk_text(text, chunk_size):
 
     return chunks
 
-def run_search(dataset_location, query=None, search_key=None, output_keys=None, search_type=None, top_k=5, chunk_size=100):
+def run_search(dataset_location, query=None, search_keys=None, output_keys=None, search_type=None, top_k=5, chunk_size=100, max_output_tokens=200):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cache_file = os.path.join(script_dir, f"{dataset_location.replace('/', '_')}_cached_dataset.json")
-    embedded_cache_file = os.path.join(script_dir, f"{dataset_location.replace('/', '_')}_{search_key}_embedded_dataset.pkl")
+    embedded_cache_file = os.path.join(script_dir, f"{dataset_location.replace('/', '_')}_{'_'.join(search_keys)}_embedded_dataset.pkl")
 
     cached_dataset = load_cached_dataset(cache_file)
 
     if cached_dataset is None:
-        print(ORANGE + "Loading dataset...")
+        print(CYAN + "Loading dataset...")
         dataset = load_dataset(dataset_location)
         dataset_list = list(dataset['train'])
-        print(ORANGE + "Saving cached dataset...")
+        print(CYAN + "Saving cached dataset...")
         save_cached_dataset(dataset_list, cache_file)
     else:
         dataset_list = cached_dataset
 
-    if not search_key or not output_keys or not search_type:
-        print(LIGHT_ORANGE + "Available keys:")
+    if not search_keys or not output_keys or not search_type:
+        print(MAGENTA + "Available keys:")
         keys = list(dataset_list[0].keys())
         for key in keys:
-            print(ORANGE + f"- {key}")
+            print(WHITE + f"- {key}")
         return
 
     if search_type.lower() == 'embedding':
         if not os.path.exists(embedded_cache_file):
             embedder = Embed4All()
             embedded_dataset = {}
-            print(ORANGE + "Embedding dataset...")
+            print(CYAN + "Embedding dataset...")
             for index, example in enumerate(tqdm(dataset_list, desc="Embedding")):
-                if search_key in example:
-                    value = example[search_key]
-                    chunks = chunk_text(value, chunk_size)
-                    for i, chunk in enumerate(chunks):
-                        chunk_embedding = embedder.embed(chunk['text'])
-                        embedded_dataset[f"{index}_{i}"] = {
-                            'embedding': chunk_embedding,
-                            'full_schema': example
-                        }
-            print(ORANGE + "Saving embedded dataset...")
+                embedded_dataset[str(index)] = {'embeddings': [], 'full_schema': example}
+                for search_key in search_keys:
+                    if search_key in example:
+                        value = example[search_key]
+                        chunks = chunk_text(value, chunk_size)
+                        for chunk in chunks:
+                            chunk_embedding = embedder.embed(chunk['text'])
+                            embedded_dataset[str(index)]['embeddings'].append(chunk_embedding)
+            print(CYAN + "Saving embedded dataset...")
             with open(embedded_cache_file, 'wb') as file:
                 pickle.dump(embedded_dataset, file)
         else:
-            print(ORANGE + "Loading embedded dataset...")
+            print(CYAN + "Loading embedded dataset...")
             with open(embedded_cache_file, 'rb') as file:
                 embedded_dataset = pickle.load(file)
 
         embedder = Embed4All(device='gpu')
 
     if search_type.lower() == 'keyword':
-        print(ORANGE + "Performing keyword search...")
-        top_results = keyword_search(dataset_list, query, search_key, top_k)
+        print(CYAN + "Performing keyword search...")
+        top_results = keyword_search(dataset_list, query, search_keys, top_k)
     elif search_type.lower() == 'embedding':
-        print(ORANGE + "Performing embedding search...")
-        top_results = []
-        query_chunks = chunk_text(query, chunk_size)
-        for query_chunk in tqdm(query_chunks, desc="Searching"):
-            user_embedding = embedder.embed(query_chunk['text'])
-            chunk_results = cosine_search(embedded_dataset, user_embedding, top_k)
-            top_results.extend(chunk_results)
-        top_results = sorted(top_results, key=lambda x: x[0])[:top_k]
+        print(CYAN + "Performing embedding search...")
+        query_embedding = embedder.embed(query)
+        weights = [1.0 / len(search_keys)] * len(search_keys)  # Equal weights for now
+        top_results = cosine_search_multi_key(embedded_dataset, query_embedding, top_k, weights)
     else:
         raise ValueError("Invalid search type. Please enter 'embedding' or 'keyword'.")
 
     if top_results:
-        #print(LIGHT_ORANGE + "Search Results:")
         for i, result in enumerate(top_results, start=1):
-            distance, key, matched_schema = result
-            print(ORANGE + Style.BRIGHT + f"Top {i} Result:")
-            #print(DARK_ORANGE + f"Matched Value: {key}")
-            print(DARKER_ORANGE + f"Distance/Count: {distance}")
-            print(BURNT_ORANGE + "Full Schema:")
-            print(Style.DIM + json.dumps(matched_schema, indent=2))
-            print(LIGHT_ORANGE + "Formatted Output:")
-            output = format_output(matched_schema, output_keys, chunk_size)
-            print(ORANGE + output)
+            if search_type.lower() == 'keyword':
+                count, matched_schema = result
+                print(MAGENTA + f"Top {i} Result:")
+                print(GREEN + f"Keyword Count: {count}")
+            else:
+                distance, key, matched_schema = result
+                print(MAGENTA + f"Top {i} Result:")
+                print(GREEN + f"Distance: {distance}")
+            
+            print(YELLOW + "Full Schema:")
+            schema_json = json.dumps(matched_schema, indent=2)
+            highlighted_schema = detect_and_highlight(schema_json)
+            print(highlighted_schema)
+            
+            print(BLUE + "Formatted Output:")
+            truncated_output = format_output(matched_schema, output_keys, max_output_tokens)
+            print(truncated_output)
             print()
     else:
-        print(BURNT_ORANGE + "No matching results found.")
+        print(RED + "No matching results found.")
 
 if __name__ == '__main__':
-    print(LIGHT_ORANGE + Style.BRIGHT + "Dataset Search Tool")
-    print(ORANGE + "-------------------")
+    print(CYAN + Style.BRIGHT + "Dataset Search Tool")
+    print(MAGENTA + "-------------------")
 
     parser = argparse.ArgumentParser(description='Search Hugging Face dataset')
     parser.add_argument('dataset', help='Hugging Face dataset location (e.g., username/dataset_name)')
     parser.add_argument('query', nargs='?', default=None, help='Search query')
-    parser.add_argument('--search_key', help='Key to search against')
+    parser.add_argument('--search_keys', nargs='+', help='Keys to search against (space-separated)')
     parser.add_argument('--output_keys', nargs='+', help='Output keys (space-separated)')
     parser.add_argument('--search_type', choices=['embedding', 'keyword'], help='Search type (embedding/keyword)')
     parser.add_argument('--top_k', type=int, default=5, help='Number of top results to return')
-    parser.add_argument('--chunk_size', type=int, default=100, help='Chunk size for embedding resolution and output formatting')
+    parser.add_argument('--chunk_size', type=int, default=100, help='Chunk size for embedding resolution')
+    parser.add_argument('--max_output_tokens', type=int, default=200, help='Maximum number of tokens for each output field')
     args = parser.parse_args()
 
-    print(DARK_ORANGE + f"Searching dataset: {args.dataset}")
-    print(DARK_ORANGE + f"Query: {args.query}")
-    print(DARK_ORANGE + f"Search type: {args.search_type}")
+    print(GREEN + f"Searching dataset: {args.dataset}")
+    print(GREEN + f"Query: {args.query}")
+    print(GREEN + f"Search type: {args.search_type}")
+    print(GREEN + f"Search keys: {', '.join(args.search_keys)}")
     print()
 
-    run_search(args.dataset, args.query, args.search_key, args.output_keys, args.search_type, args.top_k, args.chunk_size)
+    run_search(args.dataset, args.query, args.search_keys, args.output_keys, args.search_type, args.top_k, args.chunk_size, args.max_output_tokens)
