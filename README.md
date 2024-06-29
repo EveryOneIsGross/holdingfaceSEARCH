@@ -85,21 +85,10 @@ This flexible mapping allows you to focus on the most relevant parts of the data
    ```
    python janusCHAT_02.py username/dataset_name --search_keys title content --output_keys title content url --search_type embedding --top_k 3
    ```
-```ANSI
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                                                             │
-│  \033[1;36mHoldingface & Janus: Your Dataset Exploration Companions\033[0m  │
-│                                                                             │
-│  \033[1;33m• Holdingface:\033[0m Search Hugging Face datasets with ease     │
-│  \033[1;35m• Janus:\033[0m Engage in insightful conversations using data    │
-│  \033[1;32m• Schema Mapping:\033[0m Customize your dataset exploration      │
-│  \033[1;34m• Key Discovery:\033[0m Uncover the structure of your data       │
-│                                                                             │
-│  \033[1;32mEmbark on your data-driven journey today!\033[0m                 │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
 
-Happy exploring! 🚀
+---
+
+## Dataset Search
 
 ### Arguments
 
@@ -111,7 +100,7 @@ Happy exploring! 🚀
 - `--top_k`: Number of top results to return (default: 5)
 - `--chunk_size`: Chunk size for embedding resolution (default: 100)
 - `--max_output_tokens`: Maximum number of tokens for each output field (default: 200)
-```
+
 ### Example
 
 ```
@@ -142,4 +131,4 @@ The tool caches datasets and embeddings to improve performance for subsequent se
 
 ## Note
 
-This tool requires an internet connection to download datasets from Hugging Face. Ensure you have sufficient disk space for caching large datasets and their embeddings.
+This tool requires an internet connection to download datasets from Hugging Face. Ensure you have sufficient disk space for caching large datasets and their embeddings. It transforms the files, so not intended as a 1 to 1 backuptool for your hf datasets. 
