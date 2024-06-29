@@ -4,70 +4,6 @@
 # Holdingface & Janus:
 Dataset Search and Chat Tool
 
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffaa00', 'primaryTextColor': '#000000', 'primaryBorderColor': '#ffaa00', 'lineColor': '#ffaa00', 'secondaryColor': '#ffaa00', 'tertiaryColor': '#ffaa00', 'clusterBkg': 'none', 'clusterBorder': 'none', 'fontSize': '20px'}}}%%
-graph TD
-    A[User Input] --> B[Holdingface]
-    B --> C{Dataset Search}
-    C --> |Keyword| D[Keyword Search]
-    C --> |Embedding| E[Embedding Search]
-    D --> F[Search Results]
-    E --> F
-    F --> G[Janus]
-    G --> H[LLM Conversation]
-    H --> I[User Output]
-    I --> |Feedback Loop| A
-    
-    B -.-> J[Schema Mapping]
-    J -.-> K[Output Available Keys]
-    K -.-> |Update| J
-    
-    subgraph Holdingface System
-    B
-    C
-    D
-    E
-    F
-    J
-    K
-    end
-    
-    subgraph Janus System
-    G
-    H
-    end
-    
-    L[Dataset Loader] --> B
-    M[Embedding Model] --> E
-    N[Tokenizer] --> D
-    N --> E
-    
-    O[Result Formatter] --> F
-    P[Context Preparer] --> G
-    
-    Q[OpenAI API] --> H
-    
-    R[Conversation History] --> H
-    H --> |Update| R
-    
-    S[User Interface] --> A
-    I --> S
-    
-    T[Cache Manager] --> B
-    B --> |Update| T
-    
-    U[Argument Parser] --> B
-    U --> G
-    
-    V[Error Handler] --> B
-    V --> G
-    V --> H
-    
-    W[Logger] --> B
-    W --> G
-    W --> H
-```
-
 ## 🌈 README
 
 Holdingface (keyword / embedding search ) and Janus (dataset rag chat) are simple tools for searching Hugging Face datasets and engaging in LLM-powered conversations based on the search results. They also support schema mapping and key discovery for flexible dataset exploration.
@@ -133,6 +69,72 @@ This flexible mapping allows you to focus on the most relevant parts of the data
    ```
    python janusCHAT_02.py username/dataset_name --search_keys title content --output_keys title content url --search_type embedding --top_k 3
    ```
+
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#ffaa00', 'primaryTextColor': '#000000', 'primaryBorderColor': '#ffaa00', 'lineColor': '#ffaa00', 'secondaryColor': '#ffaa00', 'tertiaryColor': '#ffaa00', 'clusterBkg': 'none', 'clusterBorder': 'none', 'fontSize': '20px'}}}%%
+graph TD
+    A[User Input] --> B[Holdingface]
+    B --> C{Dataset Search}
+    C --> |Keyword| D[Keyword Search]
+    C --> |Embedding| E[Embedding Search]
+    D --> F[Search Results]
+    E --> F
+    F --> G[Janus]
+    G --> H[LLM Conversation]
+    H --> I[User Output]
+    I --> |Feedback Loop| A
+    
+    B -.-> J[Schema Mapping]
+    J -.-> K[Output Available Keys]
+    K -.-> |Update| J
+    
+    subgraph Holdingface System
+    B
+    C
+    D
+    E
+    F
+    J
+    K
+    end
+    
+    subgraph Janus System
+    G
+    H
+    end
+    
+    L[Dataset Loader] --> B
+    M[Embedding Model] --> E
+    N[Tokenizer] --> D
+    N --> E
+    
+    O[Result Formatter] --> F
+    P[Context Preparer] --> G
+    
+    Q[OpenAI API] --> H
+    
+    R[Conversation History] --> H
+    H --> |Update| R
+    
+    S[User Interface] --> A
+    I --> S
+    
+    T[Cache Manager] --> B
+    B --> |Update| T
+    
+    U[Argument Parser] --> B
+    U --> G
+    
+    V[Error Handler] --> B
+    V --> G
+    V --> H
+    
+    W[Logger] --> B
+    W --> G
+    W --> H
+```
+
 
 ---
 
