@@ -1,53 +1,104 @@
 
 ![monochrome_threshold_transparent](https://github.com/EveryOneIsGross/holdingfaceSEARCH/assets/23621140/e3efb20e-ef22-41b1-99c6-a7577ea4d135)
 
-This script allows you to search a Hugging Face dataset using either keyword or embedding-based search. 
-The script can be run directly from the command line or imported into another script to call the `run_search` function.
+# Holdingface & Janus: Dataset Search and Chat Tools
 
-# Dataset Search Tool
-
-## Overview
-
-The Dataset Search Tool is a powerful Python script designed to search and analyze Hugging Face datasets. It supports both keyword-based and embedding-based searches across multiple fields, with the ability to cache datasets and embeddings for improved performance. The tool features syntax highlighting for JSON, XML, and HTML content, as well as a retro CGA-style color scheme for improved readability.
-
-## Features
-
-- Search Hugging Face datasets using keyword or embedding-based methods
-- Support for searching across multiple fields with customizable weights
-- Cache datasets and embeddings for faster subsequent searches
-- Truncate output to a specified number of tokens
-- Syntax highlighting for JSON, XML, and HTML content in search results
-- Customizable search parameters including chunk size and number of results
-
-## Requirements
-
-- Python 3.6+
-- Required Python packages:
-  - datasets
-  - gpt4all
-  - scipy
-  - tiktoken
-  - tqdm
-  - colorama
-  - pygments
-  - numpy
-
-## Installation
-
-1. Clone this repository or download the script.
-2. Install the required packages:
-
-```
-pip install datasets gpt4all scipy tiktoken tqdm colorama pygments numpy
+```mermaid
+graph TD
+    A[User Input] --> B[Holdingface]
+    B --> C[Dataset Search]
+    C --> D[Keyword Search]
+    C --> E[Embedding Search]
+    D --> F[Search Results]
+    E --> F
+    F --> G[Janus]
+    G --> H[LLM Conversation]
+    H --> I[User Output]
+    I --> A
+    B -.-> J[Schema Mapping]
+    J -.-> K[Output Available Keys]
 ```
 
-## Usage
+## 🌈 README
 
-Run the script from the command line with the following syntax:
+Holdingface (keyword / embedding search ) and Janus (dataset rag chat) are simple tools for searching Hugging Face datasets and engaging in LLM-powered conversations based on the search results. They also support schema mapping and key discovery for flexible dataset exploration.
 
-```
-python dataset_search_tool.py <dataset> <query> --search_keys <key1> <key2> ... --output_keys <key1> <key2> ... --search_type <type> --top_k <num> --chunk_size <size> --max_output_tokens <num>
-```
+### Features:
+- 🔍 Search Hugging Face datasets using keywords or embeddings
+- 💬 Interactive chat with an LLM using search results as context
+- 🎨 Colorful and user-friendly command-line interface
+- 🗺️ Schema mapping for flexible dataset exploration
+- 🔑 Discover and output available keys in the dataset
+
+### Requirements:
+- Python 3.7+
+- Required packages: datasets, gpt4all, scipy, tiktoken, tqdm, colorama, pygments, openai
+
+## 📘 User Guide
+
+To use Holdingface and Janus, follow these steps:
+
+1. Install required packages:
+   ```
+   pip install datasets gpt4all scipy tiktoken tqdm colorama pygments openai
+   ```
+
+2. Discover available keys in the dataset:
+   ```
+   python holdingfaceSEARCH_12.py <dataset_location>
+   ```
+   This will output the available keys in the dataset without performing a search.
+
+3. Run Holdingface (Dataset Search):
+   ```
+   python holdingfaceSEARCH_12.py <dataset_location> <query> --search_keys <key1> <key2> --output_keys <key1> <key2> --search_type <embedding/keyword> [--top_k <number>] [--chunk_size <number>] [--max_output_tokens <number>]
+   ```
+
+4. Run Janus (Interactive Chat):
+   ```
+   python janusCHAT_02.py <dataset_location> --search_keys <key1> <key2> --output_keys <key1> <key2> --search_type <embedding/keyword> [--top_k <number>] [--chunk_size <number>] [--max_output_tokens <number>]
+   ```
+
+### Schema Mapping and Key Selection
+
+Holdingface allows you to map the Hugging Face dataset to a specific schema by selecting which keys to search and output. This is done using the `--search_keys` and `--output_keys` parameters:
+
+- `--search_keys`: Specify which fields in the dataset to search against
+- `--output_keys`: Specify which fields to include in the search results
+
+This flexible mapping allows you to focus on the most relevant parts of the dataset for your specific use case.
+
+### Example Usage:
+
+1. Discover available keys:
+   ```
+   python holdingfaceSEARCH_12.py username/dataset_name
+   ```
+
+2. Search using specific keys:
+   ```
+   python holdingfaceSEARCH_12.py username/dataset_name "search query" --search_keys title content --output_keys title content url --search_type embedding --top_k 5
+   ```
+
+3. Interactive chat using mapped schema:
+   ```
+   python janusCHAT_02.py username/dataset_name --search_keys title content --output_keys title content url --search_type embedding --top_k 3
+   ```
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  \033[1;36mHoldingface & Janus: Your Dataset Exploration Companions\033[0m  │
+│                                                                             │
+│  \033[1;33m• Holdingface:\033[0m Search Hugging Face datasets with ease     │
+│  \033[1;35m• Janus:\033[0m Engage in insightful conversations using data    │
+│  \033[1;32m• Schema Mapping:\033[0m Customize your dataset exploration      │
+│  \033[1;34m• Key Discovery:\033[0m Uncover the structure of your data       │
+│                                                                             │
+│  \033[1;32mEmbark on your data-driven journey today!\033[0m                 │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Happy exploring! 🚀
 
 ### Arguments
 
