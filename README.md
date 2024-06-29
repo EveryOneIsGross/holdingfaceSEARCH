@@ -85,7 +85,7 @@ This flexible mapping allows you to focus on the most relevant parts of the data
    ```
    python janusCHAT_02.py username/dataset_name --search_keys title content --output_keys title content url --search_type embedding --top_k 3
    ```
-
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                                                                             │
 │  \033[1;36mHoldingface & Janus: Your Dataset Exploration Companions\033[0m  │
@@ -111,7 +111,7 @@ Happy exploring! 🚀
 - `--top_k`: Number of top results to return (default: 5)
 - `--chunk_size`: Chunk size for embedding resolution (default: 100)
 - `--max_output_tokens`: Maximum number of tokens for each output field (default: 200)
-
+```
 ### Example
 
 ```
