@@ -1,7 +1,8 @@
 
 ![monochrome_threshold_transparent](https://github.com/EveryOneIsGross/holdingfaceSEARCH/assets/23621140/e3efb20e-ef22-41b1-99c6-a7577ea4d135)
 
-# Holdingface & Janus: Dataset Search and Chat Tools
+# Holdingface & Janus:
+Dataset Search and Chat Tool
 
 ```mermaid
 graph TD
