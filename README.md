@@ -85,7 +85,7 @@ This flexible mapping allows you to focus on the most relevant parts of the data
    ```
    python janusCHAT_02.py username/dataset_name --search_keys title content --output_keys title content url --search_type embedding --top_k 3
    ```
-```text
+```ANSI
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                                                                             │
 │  \033[1;36mHoldingface & Janus: Your Dataset Exploration Companions\033[0m  │
