@@ -19,6 +19,9 @@ Holdingface (keyword / embedding search ) and Janus (dataset rag chat) are simpl
 - Python 3.7+
 - Required packages: datasets, gpt4all, scipy, tiktoken, tqdm, colorama, pygments, openai
 
+![image](https://github.com/EveryOneIsGross/holdingfaceSEARCH/assets/23621140/86f695ca-2b84-4be7-b5b1-e4d8bb7ca955)
+
+
 ## 📘 User Guide
 
 To use Holdingface and Janus, follow these steps:
