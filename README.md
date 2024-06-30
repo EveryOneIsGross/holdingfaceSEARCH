@@ -184,4 +184,4 @@ The tool caches datasets and embeddings to improve performance for subsequent se
 
 ## Note
 
-This tool requires an internet connection to download datasets from Hugging Face. Ensure you have sufficient disk space for caching large datasets and their embeddings. It transforms the files, so not intended as a 1 to 1 backuptool for your hf datasets. 
+This tool requires an internet connection to download datasets from Hugging Face. Ensure you have sufficient disk space for caching large datasets and their embeddings. It transforms the files, so not intended as a 1 to 1 backuptool for your hf datasets. It will take 12~hrs to embed IMBDb scale datasets. Use keyword search to skip embedding wait time for simple vibez~.
