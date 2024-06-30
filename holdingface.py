@@ -27,9 +27,6 @@ GREEN = Fore.GREEN + Style.BRIGHT
 RED = Fore.RED + Style.BRIGHT
 BLUE = Fore.BLUE + Style.BRIGHT
 
-# Static value for initial embedding size
-INITIAL_EMBEDDING_SIZE = 16
-
 # Global tokenizer instance
 tokenizer = tiktoken.get_encoding("cl100k_base")
 
@@ -51,11 +48,12 @@ def keyword_search(dataset, query, search_keys, top_k):
     for example in dataset:
         total_count = 0
         for search_key in search_keys:
-            if search_key in example:
+            if search_key in example and example[search_key]:
                 value = str(example[search_key]).lower()
                 keyword_count = sum(keyword in value for keyword in query_keywords)
                 total_count += keyword_count
-        keyword_counts.append((total_count, example))
+        if total_count > 0:
+            keyword_counts.append((total_count, example))
 
     keyword_counts.sort(reverse=True, key=lambda x: x[0])
     top_results = keyword_counts[:top_k]
@@ -63,6 +61,8 @@ def keyword_search(dataset, query, search_keys, top_k):
     return top_results
 
 def truncate_text(text, max_tokens):
+    if not text:
+        return ""
     tokens = tokenizer.encode(text)
     if len(tokens) <= max_tokens:
         return text
@@ -85,6 +85,8 @@ def truncate_text(text, max_tokens):
         return truncated_text
 
 def detect_and_highlight(text):
+    if not text:
+        return ""
     try:
         if isinstance(text, dict):
             text = json.dumps(text, indent=2)
@@ -106,7 +108,7 @@ def detect_and_highlight(text):
 def format_output(schema, output_keys, max_tokens=100):
     output = ""
     for key in output_keys:
-        if key in schema:
+        if key in schema and schema[key]:
             text = schema[key]
             truncated_text = truncate_text(text, max_tokens)
             highlighted_text = detect_and_highlight(truncated_text)
@@ -114,7 +116,16 @@ def format_output(schema, output_keys, max_tokens=100):
     return output
 
 def chunk_text(text, chunk_size):
-    tokens = tokenizer.encode(text)
+    if not text or not isinstance(text, str):
+        return []
+    
+    try:
+        tokens = tokenizer.encode(text)
+    except Exception as e:
+        print(f"Error encoding text: {e}")
+        print(f"Problematic text: {text[:100]}...")  # Print first 100 characters
+        return []
+
     chunks = []
     start_idx = 0
     current_char_position = 0
@@ -197,15 +208,20 @@ def run_search(dataset_location, query=None, search_keys=None, output_keys=None,
             embedded_dataset = {}
             print(CYAN + "Embedding dataset...")
             for index, example in enumerate(tqdm(dataset_list, desc="Embedding")):
+                valid_embedding = False
                 embedded_dataset[str(index)] = {'full_schema': example}
                 for search_key in search_keys:
-                    if search_key in example:
+                    if search_key in example and example[search_key]:
                         value = example[search_key]
                         chunks = chunk_text(value, chunk_size)
-                        if len(chunks) == 1:
-                            embedded_dataset[str(index)]['embedding'] = embedder.embed(chunks[0]['text'])
-                        else:
-                            embedded_dataset[str(index)]['embeddings'] = [embedder.embed(chunk['text']) for chunk in chunks]
+                        if chunks:
+                            valid_embedding = True
+                            if len(chunks) == 1:
+                                embedded_dataset[str(index)]['embedding'] = embedder.embed(chunks[0]['text'])
+                            else:
+                                embedded_dataset[str(index)]['embeddings'] = [embedder.embed(chunk['text']) for chunk in chunks]
+                if not valid_embedding:
+                    del embedded_dataset[str(index)]
             print(CYAN + "Saving embedded dataset...")
             with open(embedded_cache_file, 'wb') as file:
                 pickle.dump(embedded_dataset, file)
